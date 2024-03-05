@@ -86,4 +86,12 @@ for num_proceso in NUM_PROCESOS:
 for resultado in resultados:
     print(f"Número de procesos: {resultado[0]}, Intervalo: {resultado[1]}, Tiempo promedio: {resultado[2]}, Desviación estándar: {resultado[3]}")
 
+# Gráfico
+for intervalo in INTERVALOS:
+    tiempos_promedio_intervalo = [resultado[2] for resultado in resultados if resultado[1] == intervalo]
+    plt.plot(NUM_PROCESOS, tiempos_promedio_intervalo, label=f'Intervalo {intervalo}')
 
+plt.xlabel('Número de procesos')
+plt.ylabel('Tiempo promedio')
+plt.legend()
+plt.show()
