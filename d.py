@@ -1,0 +1,94 @@
+import simpy
+import random
+import numpy as np
+import matplotlib.pyplot as plt
+
+RANDOM_SEED = 42
+NUM_PROCESOS = [25, 50, 100, 150, 200]
+INTERVALOS = [10, 5, 1]
+CPU_SPEED = 3
+MEMORIA_RAM = 100
+
+tiempos_promedio = []
+desviaciones_std = []
+
+class SistemaOperativo:
+    def __init__(self, env, num_procesos, intervalo):
+        self.env = env
+        self.procesador = simpy.Resource(env, capacity=1)
+        self.ram = simpy.Container(env, init=MEMORIA_RAM, capacity=MEMORIA_RAM)
+        self.intervalo = intervalo
+        self.num_procesos = num_procesos
+        self.tiempos_ejecucion = []
+
+    def llegada_proceso(self):
+        for i in range(self.num_procesos):
+            p = Proceso(i, self.env, self.procesador, self.ram)
+            self.env.process(p.proceso())
+            yield self.env.timeout(random.expovariate(1.0 / self.intervalo))
+
+class Proceso:
+    def __init__(self, id, env, procesador, ram):
+        self.id = id
+        self.env = env
+        self.procesador = procesador
+        self.ram = ram
+        self.memoria_necesaria = random.randint(1, 10)
+        self.instrucciones_totales = random.randint(1, 10)
+        self.instrucciones_restantes = self.instrucciones_totales
+
+    def proceso(self):
+        memoria_obtenida = yield self.ram.get(self.memoria_necesaria)
+        inicio_proceso = self.env.now
+
+        while self.instrucciones_restantes > 0:
+            with self.procesador.request() as req:
+                yield req
+
+                # Simulación de ejecución del proceso en el CPU
+                instrucciones_ejecutadas = min(CPU_SPEED, self.instrucciones_restantes)
+                yield self.env.timeout(1)  # 1 unidad de tiempo
+                self.instrucciones_restantes -= instrucciones_ejecutadas
+
+                if self.instrucciones_restantes <= 0:
+                    tiempo_total = self.env.now - inicio_proceso
+                    tiempos_promedio.append(tiempo_total)
+                    self.ram.put(memoria_obtenida)
+                    break
+
+                # Simulación de operaciones de I/O
+                if random.randint(1, 21) == 1:
+                    yield self.env.timeout(random.randint(1, 21))
+
+def simular(num_procesos, intervalo):
+    random.seed(RANDOM_SEED)
+    env = simpy.Environment()
+    sistema = SistemaOperativo(env, num_procesos, intervalo)
+    env.process(sistema.llegada_proceso())
+    env.run()
+
+    tiempo_promedio = np.mean(tiempos_promedio)
+    desviacion_std = np.std(tiempos_promedio)
+    return tiempo_promedio, desviacion_std
+
+resultados = []
+
+for num_proceso in NUM_PROCESOS:
+    for intervalo in INTERVALOS:
+        tiempo_promedio, desviacion_std = simular(num_proceso, intervalo)
+        resultados.append((num_proceso, intervalo, tiempo_promedio, desviacion_std))
+
+for resultado in resultados:
+    print(f"Número de procesos: {resultado[0]}, Intervalo: {resultado[1]}, Tiempo promedio: {resultado[2]}, Desviación estándar: {resultado[3]}")
+
+# Gráfico
+for intervalo in INTERVALOS:
+    tiempos_promedio_intervalo = [resultado[2] for resultado in resultados if resultado[1] == intervalo]
+    plt.plot(NUM_PROCESOS, tiempos_promedio_intervalo, label=f'Intervalo {intervalo}')
+
+plt.xlabel('Número de procesos')
+plt.ylabel('Tiempo promedio')
+plt.legend()
+plt.show()
+
+
